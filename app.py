@@ -1,10 +1,10 @@
 import streamlit as st
-import pandas as pd  # Korrekt importiert!
+import pandas as pd
 import json
 import os
 
 # File for data storage
-DATA_FILE = "tools_with_dynamic_filters.json"
+DATA_FILE = "tools_with_multilevel_filters.json"
 
 # Load and save data
 def load_data():
@@ -13,12 +13,33 @@ def load_data():
             return json.load(file)
     else:
         return {
+            "filters": {
+                "Lizenz": ["Kostenlos", "Freemium", "Abonnement"],
+                "Zielgruppe": ["Beginner", "Intermediate", "Pro"],
+            },
             "goals": ["Blogposts schreiben", "Social-Media-Content erstellen", "Daten analysieren"],
-            "licenses": ["Kostenlos", "Freemium", "Abonnement", "Einmalige Zahlung"],
             "tools": [
-                {"name": "ChatGPT", "licenses": ["Kostenlos", "Freemium"], "goals": ["Blogposts schreiben"], "description": "Generiere Blog-Ideen."},
-                {"name": "Canva", "licenses": ["Freemium", "Abonnement"], "goals": ["Social-Media-Content erstellen"], "description": "Erstelle Social-Media-Designs."},
-                {"name": "Power BI", "licenses": ["Abonnement"], "goals": ["Daten analysieren"], "description": "Analysiere Daten visuell."},
+                {
+                    "name": "ChatGPT",
+                    "filters": {"Lizenz": ["Kostenlos", "Freemium"], "Zielgruppe": ["Beginner", "Intermediate"]},
+                    "goals": ["Blogposts schreiben", "Social-Media-Content erstellen"],
+                    "link": "https://chat.openai.com",
+                    "tooltip": "Generiere kreative Texte mit KI.",
+                },
+                {
+                    "name": "Canva",
+                    "filters": {"Lizenz": ["Kostenlos", "Freemium"], "Zielgruppe": ["Beginner"]},
+                    "goals": ["Social-Media-Content erstellen"],
+                    "link": "https://www.canva.com",
+                    "tooltip": "Erstelle einfache Designs für Social Media.",
+                },
+                {
+                    "name": "Google Sheets",
+                    "filters": {"Lizenz": ["Kostenlos"], "Zielgruppe": ["Beginner", "Intermediate"]},
+                    "goals": ["Daten analysieren"],
+                    "link": "https://sheets.google.com",
+                    "tooltip": "Kostenlose Tabellenkalkulation für Datenanalyse.",
+                },
             ],
         }
 
@@ -31,46 +52,47 @@ data = load_data()
 
 # Streamlit App
 st.set_page_config(page_title="Dynamische Matrix", layout="wide")
-st.title("Dynamische Matrix: Tools nach Lizenz filtern")
+st.title("Tools-Filter-Matrix mit Zielen")
 
-# License filters
-st.sidebar.header("Lizenzen auswählen")
-selected_licenses = st.sidebar.multiselect("Wähle Lizenzen aus", data["licenses"], default=data["licenses"])
+# Multi-level Filters
+filters = data["filters"]
+goals = data["goals"]
 
-# Filtered tools
-filtered_tools = [
-    tool for tool in data["tools"] if any(license_ in selected_licenses for license_ in tool["licenses"])
-]
+# Display Matrix
+st.header("Matrix anzeigen")
+matrix = []
 
-# Display the matrix
-st.header("Matrix der Tools nach Anwendungsfällen")
-matrix_data = [
-    [
-        ", ".join([
-            f"{tool['name']}: {tool['description']}"
-            for tool in filtered_tools
-            if goal in tool["goals"]
-        ]) or "Keine Tools"
-        for goal in data["goals"]
-    ]
-]
-df_matrix = pd.DataFrame(matrix_data, index=["Tools"], columns=data["goals"])
+for category, attributes in filters.items():
+    for attribute in attributes:
+        row = [f"**{category}: {attribute}**"]
+        for goal in goals:
+            tools = [
+                f"[{tool['name']}]({tool['link']})" + f" ({tool['tooltip']})"
+                for tool in data["tools"]
+                if attribute in tool["filters"].get(category, []) and goal in tool["goals"]
+            ]
+            row.append(", ".join(tools) if tools else "Keine Tools")
+        matrix.append(row)
+
+df_matrix = pd.DataFrame(matrix, columns=["Filter → Ziel"] + goals)
 st.table(df_matrix)
 
 # Tool Management
 st.header("Tools verwalten")
 with st.expander("Neues Tool hinzufügen"):
     new_tool_name = st.text_input("Tool-Name")
-    new_tool_description = st.text_area("Beschreibung")
-    new_tool_licenses = st.multiselect("Lizenzen", data["licenses"])
-    new_tool_goals = st.multiselect("Anwendungsfälle", data["goals"])
+    new_tool_link = st.text_input("Tool-Link (URL)")
+    new_tool_tooltip = st.text_input("Kurzbeschreibung")
+    new_tool_filters = {category: st.multiselect(f"{category}-Filter", attributes) for category, attributes in filters.items()}
+    new_tool_goals = st.multiselect("Ziele", goals)
     if st.button("Tool hinzufügen"):
         if new_tool_name:
             data["tools"].append({
                 "name": new_tool_name,
-                "description": new_tool_description,
-                "licenses": new_tool_licenses,
+                "filters": new_tool_filters,
                 "goals": new_tool_goals,
+                "link": new_tool_link,
+                "tooltip": new_tool_tooltip,
             })
             save_data(data)
             st.success(f"Neues Tool '{new_tool_name}' hinzugefügt!")
@@ -79,9 +101,10 @@ with st.expander("Neues Tool hinzufügen"):
 st.write("**Existierende Tools:**")
 for tool in data["tools"]:
     with st.expander(f"{tool['name']}"):
-        tool["description"] = st.text_area(f"Beschreibung ({tool['name']})", value=tool["description"])
-        tool["licenses"] = st.multiselect(f"Lizenzen ({tool['name']})", data["licenses"], default=tool["licenses"])
-        tool["goals"] = st.multiselect(f"Anwendungsfälle ({tool['name']})", data["goals"], default=tool["goals"])
+        tool["link"] = st.text_input(f"Link ({tool['name']})", value=tool["link"])
+        tool["tooltip"] = st.text_input(f"Kurzbeschreibung ({tool['name']})", value=tool["tooltip"])
+        tool["filters"] = {category: st.multiselect(f"{category}-Filter ({tool['name']})", attributes, default=tool["filters"].get(category, [])) for category, attributes in filters.items()}
+        tool["goals"] = st.multiselect(f"Ziele ({tool['name']})", goals, default=tool["goals"])
         if st.button(f"Speichern ({tool['name']})"):
             save_data(data)
             st.success(f"{tool['name']} wurde aktualisiert!")
