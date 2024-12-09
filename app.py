@@ -65,12 +65,31 @@ for category, attributes in data["filters"].items():
                 for tool in data["tools"]
                 if attribute in tool["filters"].get(category, []) and goal in tool["goals"]
             ]
-            row.append(", ".join(tools) if tools else "Keine Tools")
+            row.append(", ".join(tools) if tools else "-")
         matrix.append(row)
 
 # Create DataFrame for Matrix Display
 df_matrix = pd.DataFrame(matrix, columns=["Filter"] + data["goals"])
-st.write(df_matrix.to_html(escape=False), unsafe_allow_html=True)
+
+# Styling to match the uploaded table
+st.write(
+    """<style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid black;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>""",
+    unsafe_allow_html=True,
+)
+st.write(df_matrix.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 # Tool Management Section
 st.header("Tools verwalten")
