@@ -4,7 +4,7 @@ import json
 import os
 
 # File for data storage
-DATA_FILE = "tools_with_multilevel_filters.json"
+DATA_FILE = "tools_with_embedded_filters.json"
 
 # Load and save data
 def load_data():
@@ -52,46 +52,25 @@ data = load_data()
 
 # Streamlit App
 st.set_page_config(page_title="Dynamische Matrix", layout="wide")
-st.title("Tools-Filter-Matrix mit dynamischen Filtern")
+st.title("Dynamische Tools-Matrix mit eingebetteten Filtern")
 
-# Multi-level Filters
-st.sidebar.header("Filter auswählen")
-selected_filters = {
-    category: st.sidebar.multiselect(category, attributes, default=attributes)
-    for category, attributes in data["filters"].items()
-}
-
-# Filter Tools
-filtered_tools = []
-for tool in data["tools"]:
-    match = True
-    for category, selected in selected_filters.items():
-        if not set(selected).intersection(tool["filters"].get(category, [])):
-            match = False
-            break
-    if match:
-        filtered_tools.append(tool)
-
-# Display Matrix
-st.header("Matrix der Tools nach Zielen")
+# Prepare Matrix Rows
 matrix = []
-
 for category, attributes in data["filters"].items():
     for attribute in attributes:
-        if attribute not in selected_filters.get(category, []):
-            continue
-        row = [f"**{category}: {attribute}**"]
+        row = [f"{category}: {attribute}"]
         for goal in data["goals"]:
             tools = [
-                f"[{tool['name']}]({tool['link']})" + f" ({tool['tooltip']})"
-                for tool in filtered_tools
+                f"<a href='{tool['link']}' title='{tool['tooltip']}'>{tool['name']}</a>"
+                for tool in data["tools"]
                 if attribute in tool["filters"].get(category, []) and goal in tool["goals"]
             ]
             row.append(", ".join(tools) if tools else "Keine Tools")
         matrix.append(row)
 
+# Convert to DataFrame for Display
 df_matrix = pd.DataFrame(matrix, columns=["Filter → Ziel"] + data["goals"])
-st.table(df_matrix)
+st.write(df_matrix.to_html(escape=False), unsafe_allow_html=True)
 
 # Tool Management
 st.header("Tools verwalten")
