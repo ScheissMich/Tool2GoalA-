@@ -1,68 +1,92 @@
 import streamlit as st
-import pandas as pd
+import pandas as pd  # Korrekt importiert!
 import json
+import os
 
-# Set page configuration
-st.set_page_config(
-    page_title="KI-Tools Matrix",
-    layout="wide",
-)
+# File for data storage
+DATA_FILE = "tools_with_dynamic_filters.json"
 
-# Load data (mock data as JSON for this example)
-data = {
-    "goals": ["Texte schreiben", "Daten analysieren", "Bilder bearbeiten"],
-    "tools": ["ChatGPT", "DataRobot", "DALL-E"],
-    "scenarios": {
-        ("Texte schreiben", "ChatGPT"): "Nutze ChatGPT, um Blogposts schnell zu erstellen.",
-        ("Daten analysieren", "DataRobot"): "Automatisiere deine Datenanalysen mit DataRobot.",
-        ("Bilder bearbeiten", "DALL-E"): "Erstelle kreative Bildbearbeitungen mit DALL-E."
-    },
-    "filters": {
-        "Funktionalität": ["Textgenerierung", "Datenanalyse", "Bildbearbeitung"],
-        "Kostenmodell": ["Kostenlos", "Freemium", "Abonnement"],
-        "Zielgruppe": ["Freelancer", "Teams", "Unternehmen"],
-        "Plattform": ["Web-basiert", "Desktop", "Mobile"]
-    }
-}
+# Load and save data
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as file:
+            return json.load(file)
+    else:
+        return {
+            "goals": ["Blogposts schreiben", "Social-Media-Content erstellen", "Daten analysieren"],
+            "licenses": ["Kostenlos", "Freemium", "Abonnement", "Einmalige Zahlung"],
+            "tools": [
+                {"name": "ChatGPT", "licenses": ["Kostenlos", "Freemium"], "goals": ["Blogposts schreiben"], "description": "Generiere Blog-Ideen."},
+                {"name": "Canva", "licenses": ["Freemium", "Abonnement"], "goals": ["Social-Media-Content erstellen"], "description": "Erstelle Social-Media-Designs."},
+                {"name": "Power BI", "licenses": ["Abonnement"], "goals": ["Daten analysieren"], "description": "Analysiere Daten visuell."},
+            ],
+        }
 
-# Sidebar filters
-st.sidebar.header("Filter")
-selected_functionality = st.sidebar.multiselect("Funktionalität", data["filters"]["Funktionalität"])
-selected_cost = st.sidebar.multiselect("Kostenmodell", data["filters"]["Kostenmodell"])
-selected_audience = st.sidebar.multiselect("Zielgruppe", data["filters"]["Zielgruppe"])
-selected_platform = st.sidebar.multiselect("Plattform", data["filters"]["Plattform"])
+def save_data(data):
+    with open(DATA_FILE, "w") as file:
+        json.dump(data, file, indent=4)
 
-# Header
-st.title("Interaktive Matrix: KI-Tools und Problemstellungen")
+# Load data
+data = load_data()
 
-# Create matrix structure
-st.markdown("### Matrix der Tools und Problemstellungen")
-matrix = pd.DataFrame(index=data["goals"], columns=data["tools"])
+# Streamlit App
+st.set_page_config(page_title="Dynamische Matrix", layout="wide")
+st.title("Dynamische Matrix: Tools nach Lizenz filtern")
 
-for goal, tool in data["scenarios"]:
-    matrix.loc[goal, tool] = f"**{data['scenarios'][(goal, tool)]}**"
+# License filters
+st.sidebar.header("Lizenzen auswählen")
+selected_licenses = st.sidebar.multiselect("Wähle Lizenzen aus", data["licenses"], default=data["licenses"])
 
-# Render matrix
-st.table(matrix.fillna("Keine Szenarien"))
+# Filtered tools
+filtered_tools = [
+    tool for tool in data["tools"] if any(license_ in selected_licenses for license_ in tool["licenses"])
+]
 
-# Clickable details
-st.markdown("### Details zu einem Szenario")
-clicked_goal = st.selectbox("Wähle ein Ziel", data["goals"])
-clicked_tool = st.selectbox("Wähle ein Tool", data["tools"])
+# Display the matrix
+st.header("Matrix der Tools nach Anwendungsfällen")
+matrix_data = [
+    [
+        ", ".join([
+            f"{tool['name']}: {tool['description']}"
+            for tool in filtered_tools
+            if goal in tool["goals"]
+        ]) or "Keine Tools"
+        for goal in data["goals"]
+    ]
+]
+df_matrix = pd.DataFrame(matrix_data, index=["Tools"], columns=data["goals"])
+st.table(df_matrix)
 
-if (clicked_goal, clicked_tool) in data["scenarios"]:
-    st.subheader(f"Szenario: {clicked_goal} + {clicked_tool}")
-    st.write(data["scenarios"][(clicked_goal, clicked_tool)])
-    st.write("**Verknüpfte Ressourcen:** [Mehr erfahren](https://example.com)")
+# Tool Management
+st.header("Tools verwalten")
+with st.expander("Neues Tool hinzufügen"):
+    new_tool_name = st.text_input("Tool-Name")
+    new_tool_description = st.text_area("Beschreibung")
+    new_tool_licenses = st.multiselect("Lizenzen", data["licenses"])
+    new_tool_goals = st.multiselect("Anwendungsfälle", data["goals"])
+    if st.button("Tool hinzufügen"):
+        if new_tool_name:
+            data["tools"].append({
+                "name": new_tool_name,
+                "description": new_tool_description,
+                "licenses": new_tool_licenses,
+                "goals": new_tool_goals,
+            })
+            save_data(data)
+            st.success(f"Neues Tool '{new_tool_name}' hinzugefügt!")
+            st.experimental_rerun()
 
-# Admin Functions (optional - simulate adding/editing scenarios)
-st.sidebar.subheader("Admin-Funktionen")
-if st.sidebar.checkbox("Szenarien bearbeiten"):
-    new_goal = st.sidebar.text_input("Neues Ziel")
-    new_tool = st.sidebar.text_input("Neues Tool")
-    new_scenario = st.sidebar.text_area("Neue Beschreibung")
-    if st.sidebar.button("Hinzufügen"):
-        data["goals"].append(new_goal)
-        data["tools"].append(new_tool)
-        data["scenarios"][(new_goal, new_tool)] = new_scenario
-        st.sidebar.success("Szenario hinzugefügt!")
+st.write("**Existierende Tools:**")
+for tool in data["tools"]:
+    with st.expander(f"{tool['name']}"):
+        tool["description"] = st.text_area(f"Beschreibung ({tool['name']})", value=tool["description"])
+        tool["licenses"] = st.multiselect(f"Lizenzen ({tool['name']})", data["licenses"], default=tool["licenses"])
+        tool["goals"] = st.multiselect(f"Anwendungsfälle ({tool['name']})", data["goals"], default=tool["goals"])
+        if st.button(f"Speichern ({tool['name']})"):
+            save_data(data)
+            st.success(f"{tool['name']} wurde aktualisiert!")
+        if st.button(f"Löschen ({tool['name']})"):
+            data["tools"].remove(tool)
+            save_data(data)
+            st.warning(f"{tool['name']} wurde gelöscht!")
+            st.experimental_rerun()
