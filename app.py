@@ -4,7 +4,7 @@ import json
 import os
 
 # File for data storage
-DATA_FILE = "tools_with_embedded_filters.json"
+DATA_FILE = "matrix_with_inline_filters.json"
 
 # Load and save data
 def load_data():
@@ -51,8 +51,8 @@ def save_data(data):
 data = load_data()
 
 # Streamlit App
-st.set_page_config(page_title="Dynamische Matrix", layout="wide")
-st.title("Dynamische Tools-Matrix mit eingebetteten Filtern")
+st.set_page_config(page_title="Tools-Matrix", layout="wide")
+st.title("Tools-Matrix mit Filtern und Zielen")
 
 # Prepare Matrix Rows
 matrix = []
@@ -68,11 +68,11 @@ for category, attributes in data["filters"].items():
             row.append(", ".join(tools) if tools else "Keine Tools")
         matrix.append(row)
 
-# Convert to DataFrame for Display
-df_matrix = pd.DataFrame(matrix, columns=["Filter → Ziel"] + data["goals"])
+# Create DataFrame for Matrix Display
+df_matrix = pd.DataFrame(matrix, columns=["Filter"] + data["goals"])
 st.write(df_matrix.to_html(escape=False), unsafe_allow_html=True)
 
-# Tool Management
+# Tool Management Section
 st.header("Tools verwalten")
 with st.expander("Neues Tool hinzufügen"):
     new_tool_name = st.text_input("Tool-Name")
@@ -90,7 +90,7 @@ with st.expander("Neues Tool hinzufügen"):
                 "tooltip": new_tool_tooltip,
             })
             save_data(data)
-            st.success(f"Neues Tool '{new_tool_name}' hinzugefügt!")
+            st.success(f"Neues Tool '{new_tool_name}' wurde hinzugefügt!")
             st.experimental_rerun()
 
 st.write("**Existierende Tools:**")
