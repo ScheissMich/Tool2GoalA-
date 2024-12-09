@@ -52,29 +52,45 @@ data = load_data()
 
 # Streamlit App
 st.set_page_config(page_title="Dynamische Matrix", layout="wide")
-st.title("Tools-Filter-Matrix mit Zielen")
+st.title("Tools-Filter-Matrix mit dynamischen Filtern")
 
 # Multi-level Filters
-filters = data["filters"]
-goals = data["goals"]
+st.sidebar.header("Filter auswählen")
+selected_filters = {
+    category: st.sidebar.multiselect(category, attributes, default=attributes)
+    for category, attributes in data["filters"].items()
+}
+
+# Filter Tools
+filtered_tools = []
+for tool in data["tools"]:
+    match = True
+    for category, selected in selected_filters.items():
+        if not set(selected).intersection(tool["filters"].get(category, [])):
+            match = False
+            break
+    if match:
+        filtered_tools.append(tool)
 
 # Display Matrix
-st.header("Matrix anzeigen")
+st.header("Matrix der Tools nach Zielen")
 matrix = []
 
-for category, attributes in filters.items():
+for category, attributes in data["filters"].items():
     for attribute in attributes:
+        if attribute not in selected_filters.get(category, []):
+            continue
         row = [f"**{category}: {attribute}**"]
-        for goal in goals:
+        for goal in data["goals"]:
             tools = [
                 f"[{tool['name']}]({tool['link']})" + f" ({tool['tooltip']})"
-                for tool in data["tools"]
+                for tool in filtered_tools
                 if attribute in tool["filters"].get(category, []) and goal in tool["goals"]
             ]
             row.append(", ".join(tools) if tools else "Keine Tools")
         matrix.append(row)
 
-df_matrix = pd.DataFrame(matrix, columns=["Filter → Ziel"] + goals)
+df_matrix = pd.DataFrame(matrix, columns=["Filter → Ziel"] + data["goals"])
 st.table(df_matrix)
 
 # Tool Management
@@ -83,8 +99,8 @@ with st.expander("Neues Tool hinzufügen"):
     new_tool_name = st.text_input("Tool-Name")
     new_tool_link = st.text_input("Tool-Link (URL)")
     new_tool_tooltip = st.text_input("Kurzbeschreibung")
-    new_tool_filters = {category: st.multiselect(f"{category}-Filter", attributes) for category, attributes in filters.items()}
-    new_tool_goals = st.multiselect("Ziele", goals)
+    new_tool_filters = {category: st.multiselect(f"{category}-Filter", attributes) for category, attributes in data["filters"].items()}
+    new_tool_goals = st.multiselect("Ziele", data["goals"])
     if st.button("Tool hinzufügen"):
         if new_tool_name:
             data["tools"].append({
@@ -103,8 +119,8 @@ for tool in data["tools"]:
     with st.expander(f"{tool['name']}"):
         tool["link"] = st.text_input(f"Link ({tool['name']})", value=tool["link"])
         tool["tooltip"] = st.text_input(f"Kurzbeschreibung ({tool['name']})", value=tool["tooltip"])
-        tool["filters"] = {category: st.multiselect(f"{category}-Filter ({tool['name']})", attributes, default=tool["filters"].get(category, [])) for category, attributes in filters.items()}
-        tool["goals"] = st.multiselect(f"Ziele ({tool['name']})", goals, default=tool["goals"])
+        tool["filters"] = {category: st.multiselect(f"{category}-Filter ({tool['name']})", attributes, default=tool["filters"].get(category, [])) for category, attributes in data["filters"].items()}
+        tool["goals"] = st.multiselect(f"Ziele ({tool['name']})", data["goals"], default=tool["goals"])
         if st.button(f"Speichern ({tool['name']})"):
             save_data(data)
             st.success(f"{tool['name']} wurde aktualisiert!")
